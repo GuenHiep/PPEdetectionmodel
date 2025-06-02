@@ -6,25 +6,32 @@ from ultralytics import YOLO
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, db
-import base64
 import cloudinary
 import cloudinary.uploader
-import cloudinary.api
+import os
+import json
 
+# --------------------------------------------
+# Đọc biến môi trường Firebase từ Railway
+firebase_json = os.environ.get("FIREBASE_CREDENTIALS_JSON")
+cred_dict = json.loads(firebase_json)
+cred = credentials.Certificate(cred_dict)
 
-# Khởi tạo Firebase
-cred = credentials.Certificate("finalprj-92f33-firebase-adminsdk-fbsvc-d6a638b37a.json")  # 🔑 Đặt file JSON này trong cùng thư mục
 firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://finalprj-92f33-default-rtdb.asia-southeast1.firebasedatabase.app/'
+    'databaseURL': os.environ.get("FIREBASE_DB_URL")
 })
 
+# --------------------------------------------
+# Cấu hình Flask
 app = Flask(__name__)
 CORS(app)
 
-# Tải mô hình YOLO
-model = YOLO("best.pt")
+# --------------------------------------------
+# Load mô hình YOLO
+model = YOLO("best.pt")  # Có thể đổi sang best.onnx nếu cần nhẹ hơn
 
-# Class name mapping
+# --------------------------------------------
+# Mapping class
 SELECTED_CLASSES = {
     0: "Earmuffs",
     1: "Face",
@@ -42,16 +49,19 @@ SELECTED_CLASSES = {
     13: "Safety-suit",
     14: "Tools"
 }
-
 REQUIRED_PPE = {"Helmet", "Safety vest", "Gloves"}
 
+# --------------------------------------------
+# Cấu hình Cloudinary từ biến môi trường
 cloudinary.config( 
-    cloud_name = "dhydhjie2", 
-    api_key = "936998357839651", 
-    api_secret = "Z7ZMI_rILP7dThBwR0YaCETilsQ",
+    cloud_name = os.environ.get("CLOUD_NAME"), 
+    api_key = os.environ.get("CLOUD_API_KEY"), 
+    api_secret = os.environ.get("CLOUD_API_SECRET"),
     secure=True
 )
 
+# --------------------------------------------
+# Upload ảnh lên Cloudinary
 def upload_image_to_cloudinary(image_path):
     try:
         response = cloudinary.uploader.upload(image_path)
@@ -61,27 +71,8 @@ def upload_image_to_cloudinary(image_path):
         print("Upload thất bại:", e)
         return None
 
-
-# Hàm push dữ liệu vi phạm lên Firebase
-# def push_to_firebase(missing_ppe, image_path):
-#     try:
-#         with open(image_path, "rb") as img_file:
-#             image_base64 = base64.b64encode(img_file.read()).decode('utf-8')
-        
-#         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-#         data = {
-#             "timestamp": timestamp,
-#             "missing_ppe": list(missing_ppe),
-#             "image_base64": image_base64
-#         }
-
-#         ref = db.reference("violations")
-#         ref.push(data)
-#         print("Cảnh báo đã được đẩy lên Firebase.")
-#     except Exception as e:
-#         print("Lỗi khi đẩy dữ liệu lên Firebase:", e)
-
+# --------------------------------------------
+# 🔥 Đẩy dữ liệu lên Firebase
 def push_to_firebase(missing_ppe, image_path):
     image_url = upload_image_to_cloudinary(image_path)
     if image_url:
@@ -97,7 +88,8 @@ def push_to_firebase(missing_ppe, image_path):
     else:
         print("Không thể upload ảnh, dữ liệu không được đẩy lên Firebase.")
 
-
+# --------------------------------------------
+# 📥 Endpoint phát hiện PPE
 @app.route('/detect', methods=['POST'])
 def detect_ppe():
     if 'image' not in request.files:
@@ -139,9 +131,30 @@ def detect_ppe():
         "image_url": "/output.jpg"
     })
 
+# --------------------------------------------
+# Trả ảnh kết quả
 @app.route('/output.jpg')
 def get_output_image():
     return send_file("output.jpg", mimetype='image/jpeg')
 
+# --------------------------------------------
+# Test kết nối Firebase
+@app.route('/test-firebase')
+def test_firebase():
+    try:
+        test_ref = db.reference("test_connection")
+        test_ref.push({
+            "status": "connected",
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+        return jsonify({"message": "Kết nối Firebase thành công!"})
+    except Exception as e:
+        return jsonify({"message": "Lỗi kết nối Firebase", "error": str(e)}), 500
+
+# --------------------------------------------
+# Chạy app
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    print("Các route Flask đã đăng ký:")
+    print(app.url_map)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

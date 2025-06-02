@@ -1,1 +1,18 @@
+# Ignore Python cache
+__pycache__/
+*.py[cod]
+
+# Ignore environment files
+.env
+*.env
+*.json
+
+# Ignore model weights
+*.pt
+*.onnx
+
+# Ignore output
+output.jpg
+
+# hoặc cụ thể:
 finalprj-92f33-firebase-adminsdk-*.json
