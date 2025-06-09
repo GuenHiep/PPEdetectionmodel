@@ -10,6 +10,7 @@ import cloudinary
 import cloudinary.uploader
 import os
 import json
+import pytz  
 
 # --------------------------------------------
 # Đọc biến môi trường Firebase từ Render
@@ -76,7 +77,9 @@ def upload_image_to_cloudinary(image_path):
 def push_to_firebase(missing_ppe, image_path):
     image_url = upload_image_to_cloudinary(image_path)
     if image_url:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        vn_tz = pytz.timezone("Asia/Ho_Chi_Minh")  # Lấy múi giờ Việt Nam
+        timestamp = datetime.now(vn_tz).strftime("%Y-%m-%d %H:%M:%S")  # Giờ VN chuẩn
+
         data = {
             "timestamp": timestamp,
             "missing_ppe": list(missing_ppe),
@@ -145,7 +148,7 @@ def test_firebase():
         test_ref = db.reference("test_connection")
         test_ref.push({
             "status": "connected",
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "timestamp": datetime.now(pytz.timezone("Asia/Ho_Chi_Minh")).strftime("%Y-%m-%d %H:%M:%S")
         })
         return jsonify({"message": "Kết nối Firebase thành công!"})
     except Exception as e:
