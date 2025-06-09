@@ -12,7 +12,7 @@ import os
 import json
 
 # --------------------------------------------
-# Đọc biến môi trường Firebase từ Railway
+# Đọc biến môi trường Firebase từ Render
 firebase_json = os.environ.get("FIREBASE_CREDENTIALS_JSON")
 cred_dict = json.loads(firebase_json)
 cred = credentials.Certificate(cred_dict)
